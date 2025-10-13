@@ -1,17 +1,22 @@
-export default async (req, res) => {
+export default async () => {
   try {
     const apiUrl = 'https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches';
     const response = await fetch(apiUrl);
     const data = await response.json();
 
-    // Zde vrátíme celý objekt pro kontrolu
-    return res.status(200).json({
-      rawData: data
-    });
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        rawData: data
+      })
+    };
   } catch (error) {
-    return res.status(500).json({
-      error: "Server error",
-      details: error.message
-    });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: "Server error",
+        details: error.message
+      })
+    };
   }
 };
