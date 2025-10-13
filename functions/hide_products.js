@@ -1,7 +1,7 @@
 const fetch = require("node-fetch");
 
 const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
-const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
+const SHOPIFY_STORE = `${process.env.SHOPIFY_STORE_NAME}.myshopify.com`;
 const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
 
 exports.handler = async function () {
