@@ -1,10 +1,7 @@
 [build]
- [build]
   functions = "functions"
   publish = "."
 
 [functions]
-  node_bundler = "esbuild"
-
-[functions.hide_products]
-  included_files = ["functions/hide_products.js"]
+  directory = "functions"
+  external_node_modules = []
