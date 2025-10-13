@@ -2,6 +2,5 @@
   functions = "functions"
   publish = "."
 
-[[functions]]
-  name = "hide_products"
-  path = "hide_products.py"
+[functions]
+  python_version = "3.10"
