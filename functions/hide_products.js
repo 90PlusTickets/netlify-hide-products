@@ -1,6 +1,6 @@
-cexports.handler = async function () {
+exports.handler = async function(event, context) {
   return {
     statusCode: 200,
-    body: JSON.stringify({ message: "Funkce funguje správně ✅" })
+    body: JSON.stringify({ message: "Funguje to!" }),
   };
 };
