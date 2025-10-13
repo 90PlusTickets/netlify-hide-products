@@ -1,0 +1,7 @@
+[functions]
+directory = "functions"
+node_bundler = "esbuild"
+
+[[functions]]
+  name = "hide_products"
+  schedule = "0 1 * * *"  # každý den v 1:00 ráno
