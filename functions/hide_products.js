@@ -25,15 +25,20 @@ exports.handler = async function () {
     });
 
     const shopifyJson = await shopifyRes.json();
-    const products = shopifyJson.products;
 
-    if (!Array.isArray(products)) {
-      console.error("Chyba: 'products' není pole", products);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "'products' není pole" }),
-      };
-    }
+console.log("Odpověď ze Shopify:", JSON.stringify(shopifyJson, null, 2));
+
+const products = shopifyJson.products;
+
+if (!Array.isArray(products)) {
+  return {
+    statusCode: 500,
+    body: JSON.stringify({
+      error: "'products' není pole",
+      rawResponse: shopifyJson
+    }),
+  };
+}
 
     // Krok 4: Projdi každý produkt a rozhodni, jestli ho skrýt
     const now = new Date();
