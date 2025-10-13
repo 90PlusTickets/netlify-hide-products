@@ -3,5 +3,7 @@
   publish = "."
 
 [functions]
-  directory = "functions"
-  external_node_modules = []
+  node_bundler = "esbuild"
+
+[functions.hide_products]
+  included_files = ["functions/hide_products.js"]
