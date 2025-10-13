@@ -1,8 +1,10 @@
 [build]
+ [build]
   functions = "functions"
   publish = "."
 
-[[redirects]]
-  from = "/.netlify/functions/hide_products"
-  to = "/.netlify/functions/hide_products"
-  status = 200
+[functions]
+  node_bundler = "esbuild"
+
+[functions.hide_products]
+  included_files = ["functions/hide_products.js"]
