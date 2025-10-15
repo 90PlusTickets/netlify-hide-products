@@ -2,6 +2,24 @@
   "name": "netlify-hide-products",
   "version": "1.0.0",
   "dependencies": {
-    "node-fetch": "^2.6.7"
-  }
+    "node-fetch": "^2.6.7",
+    "nodemailer": "^7.0.9"
+  },
+  "description": "",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/90PlusTickets/netlify-hide-products.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/90PlusTickets/netlify-hide-products/issues"
+  },
+  "homepage": "https://github.com/90PlusTickets/netlify-hide-products#readme"
 }
