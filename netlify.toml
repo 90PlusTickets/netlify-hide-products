@@ -5,9 +5,3 @@
 [functions]
   node_bundler = "esbuild"
   included_files = ["node_modules/**"]
-
-[functions.email_upcoming_hide]
-  included_files = ["functions/email_upcoming_hide.js"]
-
-[functions.hide_products]
-  included_files = ["functions/hide_products.js"]
