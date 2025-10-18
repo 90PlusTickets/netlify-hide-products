@@ -4,19 +4,31 @@ const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = `${process.env.SHOPIFY_STORE_NAME}.myshopify.com`;
 const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
 
+const ALIASES = {
+  "Sunderland": "Sunderland AFC",
+  "Wolves": "Wolverhampton Wanderers",
+  "Nottingham": "Nottingham Forest",
+  "Man United": "Manchester United",
+  "Man City": "Manchester City",
+  // Přidej další aliasy sem
+};
+
+function applyAliases(name) {
+  return ALIASES[name.trim()] || name.trim();
+}
+
 exports.handler = async function () {
   try {
-    // Krok 1: Načti zápasy z API (AC Milan, Inter atd.)
     const matchRes = await fetch(API_FUNCTION_URL);
     const matchJson = await matchRes.json();
     const matches = matchJson?.matches || [];
 
-    // Krok 2: Vytvoř seznam názvů produktů ve formátu "Home vs Away"
-    const validNames = matches.map(
-      (match) => `${match.homeTeam.name} vs ${match.awayTeam.name}`
-    );
+    const validNames = matches.map((match) => {
+      const home = applyAliases(match.homeTeam.name);
+      const away = applyAliases(match.awayTeam.name);
+      return `${home} vs ${away}`;
+    });
 
-    // Krok 3: Načti všechny produkty ze Shopify
     const shopifyRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?limit=250`, {
       headers: {
         "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
@@ -25,33 +37,19 @@ exports.handler = async function () {
     });
 
     const shopifyJson = await shopifyRes.json();
+    const products = shopifyJson.products;
 
-console.log("Odpověď ze Shopify:", JSON.stringify(shopifyJson, null, 2));
-
-const products = shopifyJson.products;
-
-if (!Array.isArray(products)) {
-  return {
-    statusCode: 500,
-    body: JSON.stringify({
-      error: "'products' není pole",
-      rawResponse: shopifyJson
-    }),
-  };
-}
-
-    // Krok 4: Projdi každý produkt a rozhodni, jestli ho skrýt
     const now = new Date();
 
     for (const product of products) {
       const title = product.title;
 
-      // a) Má produkt platný název zápasu z API?
+      // a) API název zápasu
       if (validNames.includes(title)) {
-        continue; // Produkt je aktuální, ponech
+        continue;
       }
 
-      // b) Jinak zkus načíst datum z metafieldu 'custom.match_date'
+      // b) Manuální datum zápasu
       const metafieldsRes = await fetch(
         `https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`,
         {
@@ -67,11 +65,9 @@ if (!Array.isArray(products)) {
         (f) => f.namespace === "custom" && f.key === "match_date"
       );
 
-      let matchDate = matchDateField?.value;
-      if (matchDate) {
-        const matchDateObj = new Date(matchDate);
-        if (matchDateObj < now) {
-          // Produkt skrýt
+      if (matchDateField) {
+        const matchDate = new Date(matchDateField.value);
+        if (matchDate < now) {
           await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}.json`, {
             method: "PUT",
             headers: {
@@ -81,7 +77,7 @@ if (!Array.isArray(products)) {
             body: JSON.stringify({ product: { id: product.id, status: "draft" } }),
           });
 
-          console.log(`Produkt '${title}' byl skryt (zápas proběhl).`);
+          console.log(`Skrytí produktu: ${title}`);
         }
       }
     }
@@ -91,7 +87,7 @@ if (!Array.isArray(products)) {
       body: JSON.stringify({ success: true }),
     };
   } catch (error) {
-    console.error("Chyba ve funkci hide_products:", error);
+    console.error("Chyba:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),
