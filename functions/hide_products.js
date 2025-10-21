@@ -97,62 +97,64 @@ const aliasMap = {
     "leeds united": "Leeds",
     "sc freiburg": "Freiburg",
     "tsg 1899 hoffenheim": "Hoffenheim",
-    "tottenham hotspur": "Tottenham"
+    "tottenham hotspur": "Tottenham",
+"ssc napoli": "napoli",
+"napoli": "napoli", "napoli":"Napoli"
 };
 
 function normalizeTeamName(name) {
   return aliasMap[name.trim().toLowerCase()] || name.trim();
 }
 
+// === FUNKCE ===
 exports.handler = async function () {
   try {
     const now = new Date();
-    console.log(`Spuštěno v: ${now.toISOString()}`);
+    console.log(`🚀 Spuštěno v: ${now.toISOString()}`);
+    let debugLogs = [];
 
     // 1. Načti zápasy z API
     const matchRes = await fetch(API_FUNCTION_URL);
     const matchJson = await matchRes.json();
     const matches = matchJson?.matches || [];
 
-    // 2. Vytvoř seznam názvů ve formátu "Home vs Away"
-const validNames = matches.map(
-  (match) => `${normalizeTeamName(match.homeTeam.name)} vs ${normalizeTeamName(match.awayTeam.name)}`
-);
-console.log("Názvy zápasů z API:", validNames);
+    // 2. Vytvoř seznam názvů zápasů: "Home vs Away"
+    const validNames = matches.map(
+      (match) => `${normalizeTeamName(match.homeTeam.name)} vs ${normalizeTeamName(match.awayTeam.name)}`
+    );
+    debugLogs.push(`📄 Zápasy z API: ${validNames.length} ks`);
 
-// 3. Načti produkty
-const shopifyRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?limit=250`, {
-  headers: {
-    "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
-    "Content-Type": "application/json",
-  },
-});
+    // 3. Načti produkty z Shopify
+    const shopifyRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?limit=250`, {
+      headers: {
+        "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
+        "Content-Type": "application/json",
+      },
+    });
 
-const shopifyJson = await shopifyRes.json();
-const products = shopifyJson.products;
+    const shopifyJson = await shopifyRes.json();
+    const products = shopifyJson.products;
 
-for (const product of products) {
-  const title = product.title;
+    for (const product of products) {
+      const title = product.title;
 
-  // Přeskoč produkty s tagem 'never-hide'
-  if (product.tags?.includes("never-hide")) {
-    console.log("⏭️  Přeskočeno (má tag 'never-hide')");
-    continue;
-  }
+      if (product.tags?.includes("never-hide")) {
+        debugLogs.push(`⏭️ "${title}" přeskočen (má tag 'never-hide')`);
+        continue;
+      }
 
-  // 🧠 Nové: Normalizace názvu
-  const [homeRaw, awayRaw] = title.toLowerCase().split(" vs ");
-  const normalizedTitle = `${normalizeTeamName(homeRaw)} vs ${normalizeTeamName(awayRaw)}`;
+      // 🧠 Normalizace názvu
+      const [homeRaw, awayRaw] = title.toLowerCase().split(" vs ");
+      const normalizedTitle = `${normalizeTeamName(homeRaw)} vs ${normalizeTeamName(awayRaw)}`;
+      debugLogs.push(`🔍 Kontroluji "${title}" → alias: "${normalizedTitle}"`);
 
-  console.log(`🔍 Kontroluji produkt: "${title}" → alias: "${normalizedTitle}"`);
+      // === Odpovídá API zápasu?
+      if (validNames.includes(normalizedTitle)) {
+        debugLogs.push(`✅ "${title}" je v seznamu aktivních zápasů (API) – zůstává.`);
+        continue;
+      }
 
-  // Pokud odpovídá zápasu z API, ponech
-  if (validNames.includes(normalizedTitle)) {
-    console.log("✅ Produkt odpovídá zápasu z API, ponechán aktivní.");
-    continue;
-  }
-
-      // 4b. Zjisti, zda má metapole s datem
+      // === Kontrola ručního data zápasu
       const metafieldsRes = await fetch(
         `https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`,
         {
@@ -169,16 +171,15 @@ for (const product of products) {
       );
 
       if (!matchDateField) {
-        console.log("❌ Žádné datum v metapoli.");
+        debugLogs.push(`⚠️ "${title}" není v API a nemá match_date → zůstává.`);
         continue;
       }
 
       const matchDate = new Date(matchDateField.value);
-      matchDate.setHours(23, 59, 59, 999); // ošetření případného rozdílu v čase
+      matchDate.setHours(23, 59, 59, 999); // Ošetření času
 
       if (matchDate < now) {
-        // Produkt skrýt
-        console.log(`🛑 Zápas již proběhl (${matchDate.toISOString()}), skrývám produkt.`);
+        debugLogs.push(`🛑 "${title}" – zápas proběhl (${matchDate.toISOString()}) → SKRÝVÁM.`);
 
         const updateRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}.json`, {
           method: "PUT",
@@ -195,15 +196,18 @@ for (const product of products) {
         });
 
         const updateJson = await updateRes.json();
-        console.log(`✅ Produkt "${title}" skryt.`);
+        debugLogs.push(`✅ "${title}" skryt jako 'draft'`);
       } else {
-        console.log(`🕓 Zápas je v budoucnu (${matchDate.toISOString()}), produkt zůstává aktivní.`);
+        debugLogs.push(`🕓 "${title}" – zápas v budoucnu (${matchDate.toISOString()}) → aktivní.`);
       }
     }
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: "Kontrola dokončena" }),
+      body: JSON.stringify({
+        message: "Kontrola dokončena",
+        logs: debugLogs,
+      }),
     };
   } catch (error) {
     console.error("❌ Chyba ve skriptu hide_products:", error);
