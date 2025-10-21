@@ -5,10 +5,13 @@ const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = `${process.env.SHOPIFY_STORE}.myshopify.com`;
 const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
 
+// 🧠 Bezpečná funkce pro převod jména týmu podle aliasů
 function normalizeTeamName(name) {
-  return name.trim().toLowerCase();
+  if (!name || typeof name !== "string") return "";
+  return aliasMap[name.trim().toLowerCase()] || name.trim();
 }
 
+// 🏁 Hlavní funkce
 exports.handler = async function () {
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
@@ -17,19 +20,24 @@ exports.handler = async function () {
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
   let debugLogs = [];
+
   try {
-    // 1. Získání všech produktů
-    const productsRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?status=active&limit=250`, {
-      headers: {
-        "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
-        "Content-Type": "application/json",
-      },
-    });
+    // 1️⃣ Načti produkty
+    const productsRes = await fetch(
+      `https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?status=active&limit=250`,
+      {
+        headers: {
+          "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
+          "Content-Type": "application/json",
+        },
+      }
+    );
     const productsJson = await productsRes.json();
     const products = productsJson.products || [];
 
     debugLogs.push(`🧾 Nalezeno ${products.length} aktivních produktů\n`);
 
+    // 2️⃣ Projdi produkty
     for (const product of products) {
       const title = product.title;
 
@@ -38,11 +46,16 @@ exports.handler = async function () {
         continue;
       }
 
-      // API zápasy
+      // Rozdělení názvu na domácí a hostující tým
       const [homeRaw, awayRaw] = title.toLowerCase().split(" vs ");
+      if (!homeRaw || !awayRaw) {
+        debugLogs.push(`⚠️ ${title}: Není ve formátu "Team A vs Team B", přeskočeno.`);
+        continue;
+      }
+
       const normalizedTitle = `${normalizeTeamName(homeRaw)} vs ${normalizeTeamName(awayRaw)}`;
 
-      // 2. Získání metapole
+      // 3️⃣ Načti metapole
       const metafieldsRes = await fetch(
         `https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`,
         {
@@ -62,6 +75,7 @@ exports.handler = async function () {
         continue;
       }
 
+      // 4️⃣ Porovnání dat
       const matchDate = new Date(matchDateField.value);
       const matchStr = matchDate.toISOString().split("T")[0];
 
@@ -76,6 +90,7 @@ exports.handler = async function () {
       }
     }
 
+    // 🧾 Výstup
     return {
       statusCode: 200,
       headers: { "Content-Type": "text/plain" },
