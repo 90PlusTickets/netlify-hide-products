@@ -8,12 +8,9 @@ const TARGET_EMAIL = "90plustickets@gmail.com";
 
 // Alias tabulka
 const aliasMap = {
-  // IT
   "ac milan":"ac milan","milan":"ac milan",
   "inter milan":"internazionale milano","inter":"internazionale milano",
   "atalanta":"atalanta bergamasca calcio","atalanta bergamo":"atalanta bergamasca calcio","atalanta bc":"atalanta bergamasca calcio",
-
-  // NL
   "ajax":"ajax","afc ajax":"ajax","ajax amsterdam":"ajax",
   "az":"az alkmaar","az alkmaar":"az alkmaar",
   "pec zwolle":"pec zwolle","zwolle":"pec zwolle",
@@ -28,8 +25,6 @@ const aliasMap = {
   "utrecht":"fc utrecht","fc utrecht":"fc utrecht",
   "nec":"nec nijmegen","nijmegen":"nec nijmegen","nec nijmegen":"nec nijmegen",
   "go ahead eagles":"go ahead eagles","g a eagles":"go ahead eagles","g a eagels":"go ahead eagles","go-ahead eagles":"go ahead eagles",
-
-  // DE
   "bayer leverkusen":"bayer leverkusen","bayer 04 leverkusen":"bayer leverkusen","leverkusen":"bayer leverkusen",
   "borussia dortmund":"borussia dortmund","dortmund":"borussia dortmund","bvb":"borussia dortmund",
   "1 fc union berlin":"1 fc union berlin","1. fc union berlin":"1 fc union berlin","union berlin":"1 fc union berlin",
@@ -41,25 +36,18 @@ const aliasMap = {
   "fc augsburg":"fc augsburg","augsburg":"fc augsburg",
   "1. fsv mainz 05":"1. fsv mainz 05","1 fsv mainz 05":"1. fsv mainz 05","mainz":"1. fsv mainz 05",
   "tsg 1899 hoffenheim":"tsg 1899 hoffenheim","tsg hoffenheim":"tsg 1899 hoffenheim","hoffenheim":"tsg 1899 hoffenheim",
-  // Bayern
 "bayern": "fc bayern munchen",
 "bayern munchen": "fc bayern munchen",
 "bayern munich": "fc bayern munchen",
 "fc bayern": "fc bayern munchen",
 "fc bayern munich": "fc bayern munchen",
 "fc bayern munchen": "fc bayern munchen",
-
-// Hamburg
 "hamburg": "hamburger sv",
 "hamburg sv": "hamburger sv",
 "hamburger sv": "hamburger sv",
 "hamburger sport verein": "hamburger sv",
 "hamburger sport-verein": "hamburger sv",
-
-  // ES
   "athletic club":"athletic club","ath bilbao":"athletic club","athletic bilbao":"athletic club","athletic club bilbao":"athletic club","bilbao":"athletic club",
-
-  // ENG
   "everton fc":"everton fc","everton":"everton fc",
   "nottingham forest fc":"nottingham forest fc","nottingham forest":"nottingham forest fc","nottingham":"nottingham forest fc","forest":"nottingham forest fc",
   "tottenham hotspur":"tottenham hotspur","tottenham":"tottenham hotspur","tottenham hotspurs":"tottenham hotspur","spurs":"tottenham hotspur",
@@ -81,56 +69,30 @@ const aliasMap = {
   "afc bournemouth":"afc bournemouth","bournemouth":"afc bournemouth",
   "fulham fc":"fulham fc","fulham":"fulham fc",
   "crystal palace":"crystal palace",
-
-  // SCO
   "celtic fc":"celtic fc","celtic":"celtic fc",
   "rangers fc":"rangers fc","rangers":"rangers fc",
-
-  // CZ/SK
   "ac sparta praha":"ac sparta praha","sparta praha":"ac sparta praha",
   "sk slavia praha":"sk slavia praha","slavia praha":"sk slavia praha",
-
-  // TR (evropské poháry)
   "fenerbahce":"fenerbahce","fenerbahçe":"fenerbahce",
-
-  // NT (rezerva pro ruční věci)
-  "germany":"germany","slovakia":"slovakia","ceska republika":"czech republic","czech republic":"czech republic"
-};
-
-/************** API KEYS (hezké názvy, co API očekává) **************/
-const TEAM_API_KEYS = {
-  // NL
+  "germany":"germany","slovakia":"slovakia","ceska republika":"czech republic","czech republic":"czech republic",
   "ajax":"Ajax","az alkmaar":"AZ Alkmaar","pec zwolle":"PEC Zwolle","nac breda":"NAC Breda",
   "fc groningen":"FC Groningen","heracles almelo":"Heracles Almelo","sc heerenveen":"SC Heerenveen",
   "sbv excelsior":"SBV Excelsior","telstar 1963":"Telstar 1963","feyenoord rotterdam":"Feyenoord",
   "psv eindhoven":"PSV Eindhoven","fc utrecht":"FC Utrecht","nec nijmegen":"NEC","go ahead eagles":"Go Ahead Eagles",
-
-  // DE
   "bayer leverkusen":"Bayer 04 Leverkusen","1 fc union berlin":"1. FC Union Berlin","sc freiburg":"SC Freiburg",
   "vfb stuttgart":"VfB Stuttgart","eintracht frankfurt":"Eintracht Frankfurt","fc bayern munchen":"FC Bayern München",
   "sg dynamo dresden":"SG Dynamo Dresden","fc augsburg":"FC Augsburg","1. fsv mainz 05":"1. FSV Mainz 05","tsg 1899 hoffenheim":"TSG 1899 Hoffenheim","fc bayern munchen": "FC Bayern München",
 "hamburger sv": "Hamburger SV",
-
-  // ES / SCO
   "athletic club":"Athletic Club","celtic fc":"Celtic","rangers fc":"Rangers",
-
-  // ENG
   "everton fc":"Everton","nottingham forest fc":"Nottingham Forest","tottenham hotspur":"Tottenham Hotspur",
   "manchester united":"Manchester United","arsenal fc":"Arsenal","chelsea fc":"Chelsea","leeds united":"Leeds United",
   "burnley":"Burnley","aston villa fc":"Aston Villa","sunderland afc":"Sunderland","wrexham afc":"Wrexham",
   "liverpool fc":"Liverpool","newcastle united":"Newcastle United","manchester city":"Manchester City",
   "west ham united":"West Ham United","wolverhampton wanderers":"Wolverhampton Wanderers","brighton & hove albion":"Brighton & Hove Albion",
   "brentford fc":"Brentford","afc bournemouth":"AFC Bournemouth","fulham fc":"Fulham","crystal palace":"Crystal Palace",
-
-  // CZ
   "ac sparta praha":"AC Sparta Praha","sk slavia praha":"SK Slavia Praha",
-
-  // TR
   "fenerbahce":"Fenerbahçe",
-
-  // NT
   "germany":"Germany","slovakia":"Slovakia","czech republic":"Czech Republic",
-
 "fc bayern munchen": "Bayern Munich",
     "vfb stuttgart": "Stuttgart",
     "leeds united": "Leeds",
@@ -138,9 +100,10 @@ const TEAM_API_KEYS = {
     "tsg 1899 hoffenheim": "Hoffenheim",
     "tottenham hotspur": "Tottenham"
 };
+
 // Pomocná funkce pro nahrazení aliasů
 function applyAliases(name) {
-  return ALIASES[name.trim()] || name.trim();
+  return aliasMap[name.trim().toLowerCase()] || name.trim();
 }
 
 const transporter = nodemailer.createTransport({
@@ -167,11 +130,11 @@ exports.handler = async function () {
     });
 
     const matchList = tomorrowMatches.map((match) => {
-      const home = match.homeTeam.name;
-      const away = match.awayTeam.name;
-      const date = new Date(match.utcDate).toLocaleString();
-      return `${home} vs ${away} (${date})`;
-    });
+  const home = applyAliases(match.homeTeam.name);
+  const away = applyAliases(match.awayTeam.name);
+  const date = new Date(match.utcDate).toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
+  return `${home} vs ${away} (${date})`;
+});
 
     if (matchList.length === 0) {
       return {
