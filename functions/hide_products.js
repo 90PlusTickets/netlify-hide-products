@@ -107,8 +107,8 @@ function normalizeTeamName(name) {
 }
 
 function sameDay(dateA, dateB) {
-  const d1 = new Date(dateA);
-  const d2 = new Date(dateB);
+  const d1 = new Date(new Date(dateA).toLocaleString("en-US", { timeZone: "Europe/Prague" }));
+  const d2 = new Date(new Date(dateB).toLocaleString("en-US", { timeZone: "Europe/Prague" }));
   return (
     d1.getFullYear() === d2.getFullYear() &&
     d1.getMonth() === d2.getMonth() &&
