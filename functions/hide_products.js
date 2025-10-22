@@ -186,7 +186,7 @@ exports.handler = async function () {
           body: JSON.stringify({
             product: {
               id: product.id,
-              status: "draft",
+              status: "archived",
             },
           }),
         });
