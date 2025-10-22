@@ -117,7 +117,7 @@ function sameDay(dateA, dateB) {
 }
 
 exports.handler = async function () {
-  const now = new Date();
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Prague" }));
   const today = now.toISOString().split("T")[0];
   const debug = [];
 
