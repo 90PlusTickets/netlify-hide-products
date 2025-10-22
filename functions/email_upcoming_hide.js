@@ -6,6 +6,7 @@ const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
 const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
 const TARGET_EMAIL = "90plustickets@gmail.com";
 
+
 // Alias tabulka
 const aliasMap = {
   "ac milan":"ac milan","milan":"ac milan",
@@ -101,71 +102,114 @@ const aliasMap = {
     "tottenham hotspur": "Tottenham"
 };
 
-// Pomocná funkce pro nahrazení aliasů
-function applyAliases(name) {
-  return aliasMap[name.trim().toLowerCase()] || name.trim();
+function normalizeTeamName(name) {
+  return aliasMap[name.trim().toLowerCase()] || name.trim().toLowerCase();
 }
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-});
+function sameDay(dateA, dateB) {
+  const d1 = new Date(dateA);
+  const d2 = new Date(dateB);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
 
 exports.handler = async function () {
+  const debug = [];
+  const matchesToHideTomorrow = [];
+  const now = new Date();
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
   try {
-    const matchRes = await fetch(API_FUNCTION_URL);
-    const matchJson = await matchRes.json();
-    const matches = matchJson?.matches || [];
+    // 1. Zápasy z API
+    const apiRes = await fetch(API_FUNCTION_URL);
+    const apiJson = await apiRes.json();
+    const apiMatches = apiJson.matches || [];
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
-
-    const tomorrowMatches = matches.filter((match) => {
-      const matchDate = new Date(match.utcDate).toISOString().split("T")[0];
-      return matchDate === tomorrowStr;
+    // 2. Produkty
+    const prodRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?status=active&limit=250`, {
+      headers: {
+        "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
+        "Content-Type": "application/json",
+      },
     });
 
-    const matchList = tomorrowMatches.map((match) => {
-  const home = applyAliases(match.homeTeam.name);
-  const away = applyAliases(match.awayTeam.name);
-  const date = new Date(match.utcDate).toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
-  return `${home} vs ${away} (${date})`;
-});
+    const products = (await prodRes.json()).products;
 
-    if (matchList.length === 0) {
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          message: "Žádné zápasy ke skrytí zítra.",
-          debug: [`Zítřek (datum): ${tomorrowStr}`, "Zápasy z API na zítřek: 0"],
-        }),
-      };
+    for (const product of products) {
+      const title = product.title || "";
+      if (!title.toLowerCase().includes(" vs ")) continue;
+      if (product.tags && product.tags.includes("never-hide")) continue;
+
+      const [home, away] = title.toLowerCase().split(" vs ");
+      const normTitle = `${normalizeTeamName(home)} vs ${normalizeTeamName(away)}`;
+
+      let matchDate = null;
+
+      for (const match of apiMatches) {
+        const matchTitle = `${normalizeTeamName(match.home_team)} vs ${normalizeTeamName(match.away_team)}`;
+        if (matchTitle === normTitle) {
+          matchDate = new Date(match.utcDate);
+          break;
+        }
+      }
+
+      if (!matchDate) {
+        const mfRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`, {
+          headers: {
+            "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
+            "Content-Type": "application/json",
+          },
+        });
+
+        const metafields = (await mfRes.json()).metafields;
+        const matchDateField = metafields.find(
+          (f) => f.namespace === "custom" && f.key === "match_date"
+        );
+
+        if (matchDateField) {
+          matchDate = new Date(matchDateField.value);
+        }
+      }
+
+      if (matchDate && sameDay(matchDate, tomorrow)) {
+        matchesToHideTomorrow.push(`${product.title} (${matchDate.toLocaleDateString("cs-CZ")})`);
+      }
     }
 
-    await transporter.sendMail({
-      from: `"90PlusTickets" <${process.env.MAIL_USER}>`,
-      to: TARGET_EMAIL,
-      subject: "Zítřejší zápasy ke skrytí",
-      text: `Zítřejší zápasy:\n\n${matchList.join("\n")}`,
-    });
+    // 3. ODESLAT E-MAIL
+    if (matchesToHideTomorrow.length > 0) {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.MAIL_USER,
+          pass: process.env.MAIL_PASS,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"90PlusTickets" <${process.env.MAIL_USER}>`,
+        to: TARGET_EMAIL,
+        subject: "Zápasy ke skrytí zítra",
+        text: `Zítra se skryje ${matchesToHideTomorrow.length} zápas(ů):\n\n${matchesToHideTomorrow.join("\n")}`,
+      });
+    }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        success: true,
-        sent: matchList.length,
-        debug: [`Zítřek (datum): ${tomorrowStr}`, `Zápasy z API na zítřek: ${matchList.length}`],
+        message: `Zápasů ke skrytí zítra: ${matchesToHideTomorrow.length}`,
+        list: matchesToHideTomorrow,
       }),
     };
-  } catch (error) {
-    console.error("Chyba:", error);
+  } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
+      body: `Chyba: ${err.message}`,
     };
   }
 };

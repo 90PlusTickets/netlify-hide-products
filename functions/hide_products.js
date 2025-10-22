@@ -1,6 +1,5 @@
 const fetch = require("node-fetch");
 
-// === ENVIRONMENT ===
 const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
 const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
@@ -104,80 +103,93 @@ const aliasMap = {
 };
 
 function normalizeTeamName(name) {
-  return aliasMap[name.trim().toLowerCase()] || name.trim();
+  return aliasMap[name.trim().toLowerCase()] || name.trim().toLowerCase();
+}
+
+function sameDay(dateA, dateB) {
+  const d1 = new Date(dateA);
+  const d2 = new Date(dateB);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
 }
 
 exports.handler = async function () {
   const now = new Date();
-  let debugLogs = [];
+  const today = now.toISOString().split("T")[0];
+  const debug = [];
 
   try {
-    // === 1. ZÍSKEJ AKTUÁLNÍ ZÁPASY Z API ===
-    const matchesRes = await fetch(API_FUNCTION_URL);
-    const matchesJson = await matchesRes.json();
+    // 1. API zápasy
+    const apiRes = await fetch(API_FUNCTION_URL);
+    const apiJson = await apiRes.json();
+    const apiMatches = apiJson.matches || [];
 
-    const validNames = matchesJson.matches?.map((match) => {
-      const home = normalizeTeamName(match.home_team);
-      const away = normalizeTeamName(match.away_team);
+    const activeMatchNames = apiMatches.map(m => {
+      const home = normalizeTeamName(m.home_team);
+      const away = normalizeTeamName(m.away_team);
       return `${home} vs ${away}`;
-    }) || [];
+    });
 
-    debugLogs.push(`📋 Načteno zápasů z API: ${validNames.length}`);
-
-    // === 2. ZÍSKEJ PRODUKTY ZE SHOPIFY ===
-    const productsRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?status=active&limit=250`, {
+    // 2. Produkty z Shopify
+    const prodRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?status=active&limit=250`, {
       headers: {
         "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
         "Content-Type": "application/json",
       },
     });
 
-    const productsJson = await productsRes.json();
-    const products = productsJson.products;
+    const products = (await prodRes.json()).products;
 
     for (const product of products) {
-      const title = product.title;
-
-      if (product.tags?.includes("never-hide")) {
-        debugLogs.push(`⏭️  ${title}: Přeskočeno (má tag 'never-hide')`);
+      const title = product.title || "";
+      if (!title.toLowerCase().includes(" vs ")) continue;
+      if (product.tags && product.tags.includes("never-hide")) {
+        debug.push(`⏭️ ${title} přeskočen (tag never-hide)`);
         continue;
       }
 
-      const [homeRaw, awayRaw] = title.toLowerCase().split(" vs ");
-      const normalizedTitle = `${normalizeTeamName(homeRaw)} vs ${normalizeTeamName(awayRaw)}`;
+      const [home, away] = title.toLowerCase().split(" vs ");
+      const normTitle = `${normalizeTeamName(home)} vs ${normalizeTeamName(away)}`;
 
-      if (validNames.includes(normalizedTitle)) {
-        debugLogs.push(`🟢 ${title}: Zápas odpovídá API a zůstává aktivní.`);
-        continue;
+      let matchIsToday = false;
+
+      // 3. Hledání v API
+      for (const match of apiMatches) {
+        const matchTitle = `${normalizeTeamName(match.home_team)} vs ${normalizeTeamName(match.away_team)}`;
+        if (matchTitle === normTitle && sameDay(match.utcDate, now)) {
+          matchIsToday = true;
+          break;
+        }
       }
 
-      // === 3. ZÍSKEJ DATUM Z METAFIELDS ===
-      const metafieldsRes = await fetch(
-        `https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`,
-        {
+      // 4. Pokud není v API, zkus metafield
+      if (!matchIsToday) {
+        const mfRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`, {
           headers: {
             "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
             "Content-Type": "application/json",
           },
+        });
+
+        const metafields = (await mfRes.json()).metafields;
+        const matchDateField = metafields.find(
+          (f) => f.namespace === "custom" && f.key === "match_date"
+        );
+
+        if (matchDateField) {
+          const matchDate = new Date(matchDateField.value);
+          if (sameDay(matchDate, now)) {
+            matchIsToday = true;
+          }
         }
-      );
-
-      const metafieldsJson = await metafieldsRes.json();
-      const matchDateField = metafieldsJson.metafields.find(
-        (f) => f.namespace === "custom" && (f.key === "match_date" || f.key === "match_date_manual")
-      );
-
-      if (!matchDateField) {
-        debugLogs.push(`❌ ${title}: Nemá metapole match_date ani match_date_manual`);
-        continue;
       }
 
-      const matchDate = new Date(matchDateField.value);
-      matchDate.setHours(23, 59, 59, 999);
-
-      if (matchDate < now) {
-        // === 4. SKRYJ PRODUKT ===
-        const updateRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}.json`, {
+      if (matchIsToday) {
+        // 5. SKRYJ
+        await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}.json`, {
           method: "PUT",
           headers: {
             "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
@@ -190,24 +202,20 @@ exports.handler = async function () {
             },
           }),
         });
-
-        const updateJson = await updateRes.json();
-        debugLogs.push(`🔴 ${title}: Zápas proběhl (${matchDate.toISOString()}), produkt skryt.`);
+        debug.push(`🔴 ${title} → skryt (zápas je dnes)`);
       } else {
-        debugLogs.push(`🕓 ${title}: Zápas je v budoucnu (${matchDate.toISOString()}), produkt aktivní.`);
+        debug.push(`🟢 ${title} → ponechán aktivní`);
       }
     }
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "text/plain" },
-      body: `✅ Kontrola dokončena:\n\n${debugLogs.join("\n")}`,
+      body: debug.join("\n"),
     };
-  } catch (error) {
-    console.error("❌ Chyba ve skriptu hide_products:", error);
+  } catch (err) {
     return {
       statusCode: 500,
-      body: `❌ Chyba: ${error.message}`,
+      body: `Chyba: ${err.message}`,
     };
   }
 };
