@@ -18,7 +18,8 @@ exports.handler = async function (event) {
   const teamsToFetch = [];
 
   if (teamParam) {
-    const normalizedTeam = teamParam.toLowerCase().trim();
+    // Převod "ac-milan" → "ac milan"
+    const normalizedTeam = teamParam.toLowerCase().trim().replace(/-/g, " ");
     const teamId = TEAM_IDS[normalizedTeam];
 
     if (!teamId) {
