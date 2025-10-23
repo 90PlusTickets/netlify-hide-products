@@ -1,7 +1,10 @@
-// ✅ getMatches.js (plná verze bez ?team=, načte všechny týmy)
+// functions/getMatches.js
 
-const fetch = require("node-fetch");
+const fetch = require('node-fetch');
 
+const API_KEY = process.env.FOOTBALL_API_KEY;
+
+// Map of team names (keys) to their API-Football IDs (values)
 const TEAM_IDS = {
   "ac milan": 489,
   "inter": 505,
@@ -12,40 +15,22 @@ const TEAM_IDS = {
   "vfb stuttgart": 172
 };
 
-const API_KEY = process.env.FOOTBALL_API_KEY;
-
 exports.handler = async function () {
-  // 🐞 Debug výpis
-  console.log("⚙️ Načítám zápasy pro týmy:", Object.keys(TEAM_IDS));
-  if (!API_KEY) {
-    console.error("❌ Chybí FOOTBALL_API_KEY v prostředí!");
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Missing API key" })
-    };
-  }
-
   const allMatches = [];
 
   for (const [teamKey, teamId] of Object.entries(TEAM_IDS)) {
     try {
-      const response = await fetch(
-        `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=2025&timezone=Europe/Prague`,
-        {
-          headers: {
-            "x-apisports-key": API_KEY
-          }
+      const response = await fetch(`https://v3.football.api-sports.io/fixtures?team=${teamId}&season=2025&timezone=Europe/Prague`, {
+        headers: {
+          'x-apisports-key': API_KEY
         }
-      );
+      });
 
       const data = await response.json();
 
-      if (!data.response || !Array.isArray(data.response)) {
-        console.error(`⚠️ Neplatná odpověď z API pro tým ${teamKey}:`, data);
-        continue;
-      }
+      if (!data.response) continue;
 
-      const teamMatches = data.response.map((match) => ({
+      const teamMatches = data.response.map(match => ({
         home_team: match.teams.home.name,
         away_team: match.teams.away.name,
         utcDate: match.fixture.date
@@ -53,7 +38,7 @@ exports.handler = async function () {
 
       allMatches.push(...teamMatches);
     } catch (error) {
-      console.error(`❌ Chyba při načítání pro tým ${teamKey}:`, error);
+      console.error(`❌ Chyba u týmu ${teamKey}:`, error);
     }
   }
 
