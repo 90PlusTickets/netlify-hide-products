@@ -1,3 +1,12 @@
+exports.handler = async function (event) {
+  const teamParam = event.queryStringParameters?.team;
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ debug: teamParam })
+  };
+};
+
 // functions/getMatches.js
 const fetch = require('node-fetch');
 
