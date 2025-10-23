@@ -1,31 +1,47 @@
-exports.handler = async function () {
-  try {
-    const matches = [
-      {
-        home_team: "AC Milan",
-        away_team: "Juventus",
-        utcDate: "2025-10-21T19:00:00Z",
-      },
-      {
-        home_team: "Eintracht Frankfurt",
-        away_team: "Liverpool",
-        utcDate: "2025-10-22T18:00:00Z",
-      },
-      {
-        home_team: "PSV",
-        away_team: "Napoli",
-        utcDate: "2025-10-24T20:00:00Z",
-      },
-    ];
+// functions/getMatches.js
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ matches }),
-    };
-  } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message }),
-    };
+const fetch = require('node-fetch');
+
+const TEAM_IDS = {
+  "ac milan": 489,
+"inter": 505,
+"atalanta": 499,
+"como": 895,
+"eintracht frankfurt": 169,
+"PSV Eindhoven": 197,
+"VfB Stuttgart": 172,
+};
+
+const API_KEY = process.env.FOOTBALL_API_KEY;
+
+exports.handler = async function () {
+  const allMatches = [];
+
+  for (const [teamKey, teamId] of Object.entries(TEAM_IDS)) {
+    try {
+      const response = await fetch(`https://v3.football.api-sports.io/fixtures?team=${teamId}&season=2025&timezone=Europe/Prague`, {
+        headers: {
+          'x-apisports-key': API_KEY
+        }
+      });
+
+      const data = await response.json();
+      const teamMatches = data.response
+        .filter(match => match.teams.home.id === teamId || match.teams.away.id === teamId)
+        .map(match => ({
+          home_team: match.teams.home.name,
+          away_team: match.teams.away.name,
+          utcDate: match.fixture.date
+        }));
+
+      allMatches.push(...teamMatches);
+    } catch (error) {
+      console.error(`Chyba při získávání zápasů pro tým ${teamKey}:`, error);
+    }
   }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ matches: allMatches })
+  };
 };
