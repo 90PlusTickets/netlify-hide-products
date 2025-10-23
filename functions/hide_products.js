@@ -1,4 +1,4 @@
-éconst fetch = require("node-fetch");
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
@@ -102,22 +102,6 @@ const aliasMap = {
 "napoli": "napoli", "napoli":"Napoli"
 };
 
-const fetch = require("node-fetch");
-
-const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
-const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
-const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
-
-// ALIAS MAP – (zkráceno pro přehlednost – použij svůj kompletní aliasMap)
-const aliasMap = {
-  "ac milan": "ac milan",
-  "inter milan": "internazionale milano",
-  "feyenoord": "feyenoord rotterdam",
-  "psv": "psv",
-  "frankfurt": "eintracht frankfurt",
-  "liverpool": "liverpool fc",
-  // ... další aliasy zůstávají beze změn
-};
 
 function normalizeTeamName(name) {
   return aliasMap[name.trim().toLowerCase()] || name.trim().toLowerCase();
