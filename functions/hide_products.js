@@ -1,5 +1,5 @@
 const fetch = require("node-fetch");
-const { aliasMap, normalizeTeamName } = require("./aliasMap");  // <-- DŮLEŽITÉ
+const aliasMap = require("./aliasMap");
 
 const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
