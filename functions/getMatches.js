@@ -1,4 +1,3 @@
-
 // functions/getMatches.js
 
 const fetch = require('node-fetch');
