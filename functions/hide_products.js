@@ -1,4 +1,4 @@
-const fetch = require("node-fetch");
+éconst fetch = require("node-fetch");
 
 const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
@@ -102,54 +102,45 @@ const aliasMap = {
 "napoli": "napoli", "napoli":"Napoli"
 };
 
+const fetch = require("node-fetch");
+
+const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
+const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
+const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
+
+// ALIAS MAP – (zkráceno pro přehlednost – použij svůj kompletní aliasMap)
+const aliasMap = {
+  "ac milan": "ac milan",
+  "inter milan": "internazionale milano",
+  "feyenoord": "feyenoord rotterdam",
+  "psv": "psv",
+  "frankfurt": "eintracht frankfurt",
+  "liverpool": "liverpool fc",
+  // ... další aliasy zůstávají beze změn
+};
+
 function normalizeTeamName(name) {
   return aliasMap[name.trim().toLowerCase()] || name.trim().toLowerCase();
 }
 
-function sameDay(dateA, dateB) {
+function isPastOrToday(dateA, dateB) {
   const d1 = new Date(new Date(dateA).toLocaleString("en-US", { timeZone: "Europe/Prague" }));
   const d2 = new Date(new Date(dateB).toLocaleString("en-US", { timeZone: "Europe/Prague" }));
-  return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
-  );
+
+  return d1 <= d2; // true pokud zápas byl včera nebo dnes
 }
 
 exports.handler = async function () {
   const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Prague" }));
-  const today = now.toISOString().split("T")[0];
   const debug = [];
 
   try {
-    // 1. API zápasy
+    // 1. Načti zápasy z API
     const apiRes = await fetch(API_FUNCTION_URL);
     const apiJson = await apiRes.json();
     const apiMatches = apiJson.matches || [];
 
-    const activeMatchNames = apiMatches.map(m => {
-      const home = normalizeTeamName(m.home_team);
-      const away = normalizeTeamName(m.away_team);
-      return `${home} vs ${away}`;
-});
-for (const match of apiMatches) {
-  const matchTitle = `${normalizeTeamName(match.home_team)} vs ${normalizeTeamName(match.away_team)}`;
-  if (matchTitle === normTitle) {
-    debug.push(`🕒 Kontrola zápasu z API: ${matchTitle}`);
-    debug.push(`→ match.utcDate: ${match.utcDate}`);
-    debug.push(`→ today SEČ: ${now.toISOString()}`);
-    if (sameDay(match.utcDate, now)) {
-      matchIsToday = true;
-      debug.push(`✅ Zápas z API ${matchTitle} je dnes → SKRYJEME`);
-    } else {
-      debug.push(`❌ Zápas ${matchTitle} NENÍ dnes`);
-    }
-    break;
-  }
-}
-    });
-
-    // 2. Produkty z Shopify
+    // 2. Načti aktivní produkty z Shopify
     const prodRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?status=active&limit=250`, {
       headers: {
         "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
@@ -169,20 +160,19 @@ for (const match of apiMatches) {
 
       const [home, away] = title.toLowerCase().split(" vs ");
       const normTitle = `${normalizeTeamName(home)} vs ${normalizeTeamName(away)}`;
+      let matchIsPastOrToday = false;
 
-      let matchIsToday = false;
-
-      // 3. Hledání v API
+      // 3. Zkusit najít v API
       for (const match of apiMatches) {
         const matchTitle = `${normalizeTeamName(match.home_team)} vs ${normalizeTeamName(match.away_team)}`;
-        if (matchTitle === normTitle && sameDay(match.utcDate, now)) {
-          matchIsToday = true;
+        if (matchTitle === normTitle && isPastOrToday(match.utcDate, now)) {
+          matchIsPastOrToday = true;
           break;
         }
       }
 
-      // 4. Pokud není v API, zkus metafield
-      if (!matchIsToday) {
+      // 4. Pokud ne v API, zkus metafield
+      if (!matchIsPastOrToday) {
         const mfRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`, {
           headers: {
             "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
@@ -197,15 +187,15 @@ for (const match of apiMatches) {
 
         if (matchDateField) {
           const matchDate = new Date(matchDateField.value);
-          if (sameDay(matchDate, now)) {
-  matchIsToday = true;
-  debug.push(`🔴 ${title} → skryt (zápas je dnes - ručně přes match_date)`);
-}
+          if (isPastOrToday(matchDate, now)) {
+            matchIsPastOrToday = true;
+            debug.push(`🔴 ${title} → skryt (minulý zápas – ruční match_date: ${matchDate.toISOString().split("T")[0]})`);
+          }
         }
       }
 
-      if (matchIsToday) {
-        // 5. SKRYJ
+      if (matchIsPastOrToday) {
+        // 5. ARCHIVACE PRODUKTU
         await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}.json`, {
           method: "PUT",
           headers: {
@@ -219,7 +209,7 @@ for (const match of apiMatches) {
             },
           }),
         });
-        debug.push(`🔴 ${title} → skryt (zápas je dnes)`);
+        debug.push(`🔴 ${title} → skryt (archived)`);
       } else {
         debug.push(`🟢 ${title} → ponechán aktivní`);
       }
