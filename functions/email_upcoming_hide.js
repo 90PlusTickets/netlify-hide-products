@@ -1,5 +1,5 @@
 // ✅ Finální a čistá verze `email_upcoming_hide.js`
-const { aliasMap } = require("./aliasMap");
+const aliasMap = require("./aliasMap");
 const fetch = require("node-fetch");
 const nodemailer = require("nodemailer");
 

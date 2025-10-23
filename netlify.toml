@@ -1,7 +1,8 @@
-[build]
-  functions = "functions"
-  publish = "."
-
 [functions]
   node_bundler = "esbuild"
-  included_files = ["node_modules/**"]
+
+[functions."hide_products"]
+  included_files = ["functions/aliasMap.js"]
+
+[functions."email_upcoming_hide"]
+  included_files = ["functions/aliasMap.js"]
