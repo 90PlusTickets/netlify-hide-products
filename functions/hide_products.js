@@ -1,11 +1,8 @@
-const fetch = require("node-fetch");
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+
 const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
-const API_FUNCTION_URL = "https://dreamy-sprite-72ab2d.netlify.app/.netlify/functions/getMatches";
-
-function normalizeTeamName(name) {
-  return aliasMap[name.trim().toLowerCase()] || name.trim().toLowerCase();
-}
+const API_FUNCTION_URL = process.env.API_FUNCTION_URL;
 
 
 // Alias tabulka
@@ -106,36 +103,41 @@ const aliasMap = {
 };
 
 
-function toPragueDate(dateStr) {
-  const utc = new Date(dateStr);
-  const offsetMs = 2 * 60 * 60 * 1000; // SEČ/CEST (+2h)
-  return new Date(utc.getTime() + offsetMs);
+function normalizeTeamName(name) {
+  return aliasMap[name?.trim().toLowerCase()] || name?.trim().toLowerCase();
 }
 
-function isPastOrToday(date) {
-  const today = new Date();
-  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  return compareDate <= localToday;
+function sameDay(dateA, dateB) {
+  const d1 = new Date(dateA);
+  const d2 = new Date(dateB);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
 }
 
 exports.handler = async function () {
-  const now = new Date();
   const debug = [];
+  const now = new Date();
 
   try {
-    // 1. Načíst zápasy z API
+    // 1. Získání zápasů z API
     const apiRes = await fetch(API_FUNCTION_URL);
     const apiJson = await apiRes.json();
     const apiMatches = apiJson.matches || [];
 
-    const activeMatchNames = apiMatches.map((m) => {
+    debug.push(`Z API získáno ${apiMatches.length} zápasů.`);
+    const normalizedApiMatchNames = apiMatches.map(m => {
       const home = normalizeTeamName(m.home_team);
       const away = normalizeTeamName(m.away_team);
-      return `${home} vs ${away}`;
+      return {
+        title: `${home} vs ${away}`,
+        date: new Date(m.utcDate)
+      };
     });
 
-    // 2. Načíst produkty z Shopify
+    // 2. Získání všech produktů z Shopify
     const prodRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products.json?status=active&limit=250`, {
       headers: {
         "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
@@ -148,33 +150,27 @@ exports.handler = async function () {
     for (const product of products) {
       const title = product.title || "";
       if (!title.toLowerCase().includes(" vs ")) continue;
-
       if (product.tags && product.tags.includes("never-hide")) {
-        debug.push(`⏭️ ${title} → přeskočen (tag 'never-hide')`);
+        debug.push(`⏭️ ${title} přeskočen (tag never-hide)`);
         continue;
       }
 
       const [home, away] = title.toLowerCase().split(" vs ");
       const normTitle = `${normalizeTeamName(home)} vs ${normalizeTeamName(away)}`;
-      let matchShouldBeArchived = false;
 
-      // 3. Hledat v API
-      for (const match of apiMatches) {
-        const matchTitle = `${normalizeTeamName(match.home_team)} vs ${normalizeTeamName(match.away_team)}`;
-        if (matchTitle === normTitle) {
-          const matchDate = toPragueDate(match.utcDate);
-          if (isPastOrToday(matchDate)) {
-            matchShouldBeArchived = true;
-            debug.push(`🔴 ${title} → skryt (API datum: ${matchDate.toISOString().split("T")[0]})`);
-          } else {
-            debug.push(`🟢 ${title} → aktivní (API datum: ${matchDate.toISOString().split("T")[0]})`);
-          }
-          break;
-        }
-      }
+      // 3. Hledání zápasu v API
+      const matchFromApi = normalizedApiMatchNames.find(
+        m => m.title === normTitle
+      );
 
-      // 4. Pokud není nalezeno v API nebo není na dnes/dřív, zkus ruční datum
-      if (!matchShouldBeArchived) {
+      let matchDate = null;
+      let source = "❓ žádné datum";
+
+      if (matchFromApi) {
+        matchDate = matchFromApi.date;
+        source = "📡 API";
+      } else {
+        // 4. Získání match_date z metafieldu
         const mfRes = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}/metafields.json`, {
           headers: {
             "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
@@ -188,21 +184,18 @@ exports.handler = async function () {
         );
 
         if (matchDateField) {
-          const matchDate = toPragueDate(matchDateField.value);
-          const matchStr = matchDate.toISOString().split("T")[0];
-          if (isPastOrToday(matchDate)) {
-            matchShouldBeArchived = true;
-            debug.push(`🔴 ${title} → skryt (ruční datum: ${matchStr}, zápas již proběhl)`);
-          } else {
-            debug.push(`🟢 ${title} → aktivní (ruční datum: ${matchStr})`);
-          }
-        } else {
-          debug.push(`❓ ${title} → nemá API zápas ani ruční match_date`);
+          matchDate = new Date(matchDateField.value);
+          source = `📝 ruční datum: ${matchDateField.value}`;
         }
       }
 
-      // 5. SKRYTÍ PRODUKTU
-      if (matchShouldBeArchived) {
+      if (!matchDate) {
+        debug.push(`❓ ${title} → nemá API zápas ani ruční match_date`);
+        continue;
+      }
+
+      if (matchDate < now) {
+        // Archivace produktu
         await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-04/products/${product.id}.json`, {
           method: "PUT",
           headers: {
@@ -216,6 +209,9 @@ exports.handler = async function () {
             },
           }),
         });
+        debug.push(`🔴 ${title} → archivován (${source})`);
+      } else {
+        debug.push(`🟢 ${title} → aktivní (${source})`);
       }
     }
 
@@ -226,7 +222,7 @@ exports.handler = async function () {
   } catch (err) {
     return {
       statusCode: 500,
-      body: `❌ Chyba: ${err.message}`,
+      body: `Chyba: ${err.message}`,
     };
   }
 };
