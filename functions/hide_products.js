@@ -131,6 +131,22 @@ exports.handler = async function () {
       const home = normalizeTeamName(m.home_team);
       const away = normalizeTeamName(m.away_team);
       return `${home} vs ${away}`;
+});
+for (const match of apiMatches) {
+  const matchTitle = `${normalizeTeamName(match.home_team)} vs ${normalizeTeamName(match.away_team)}`;
+  if (matchTitle === normTitle) {
+    debug.push(`🕒 Kontrola zápasu z API: ${matchTitle}`);
+    debug.push(`→ match.utcDate: ${match.utcDate}`);
+    debug.push(`→ today SEČ: ${now.toISOString()}`);
+    if (sameDay(match.utcDate, now)) {
+      matchIsToday = true;
+      debug.push(`✅ Zápas z API ${matchTitle} je dnes → SKRYJEME`);
+    } else {
+      debug.push(`❌ Zápas ${matchTitle} NENÍ dnes`);
+    }
+    break;
+  }
+}
     });
 
     // 2. Produkty z Shopify
@@ -182,8 +198,9 @@ exports.handler = async function () {
         if (matchDateField) {
           const matchDate = new Date(matchDateField.value);
           if (sameDay(matchDate, now)) {
-            matchIsToday = true;
-          }
+  matchIsToday = true;
+  debug.push(`🔴 ${title} → skryt (zápas je dnes - ručně přes match_date)`);
+}
         }
       }
 
