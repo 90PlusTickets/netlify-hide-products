@@ -45,29 +45,29 @@ const TEAM_IDS = {
 exports.handler = async function () {
   const allMatches = [];
 
-  for (const [teamName, teamId] of Object.entries(teamIds)) {
-    const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&next=10`;
+ for (const [teamName, teamId] of Object.entries(TEAM_IDS)) {
+  const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&next=10`;
 
-    const response = await fetch(url, {
-      headers: {
-        "x-apisports-key": API_KEY,
-      },
-    });
+  const response = await fetch(url, {
+    headers: {
+      "x-apisports-key": API_KEY,
+    },
+  });
 
-    if (!response.ok) {
-      console.error(`Failed to fetch matches for ${teamName}`);
-      continue;
-    }
-
-    const data = await response.json();
-    const matches = data.response.map(match => ({
-      home_team: match.teams.home.name,
-      away_team: match.teams.away.name,
-      utcDate: match.fixture.date,
-    }));
-
-    allMatches.push(...matches);
+  if (!response.ok) {
+    console.error(`Failed to fetch matches for ${teamName}`);
+    continue;
   }
+
+  const data = await response.json();
+  const matches = data.response.map(match => ({
+    home_team: match.teams.home.name,
+    away_team: match.teams.away.name,
+    utcDate: match.fixture.date,
+  }));
+
+  allMatches.push(...matches);
+}
 
   return {
     statusCode: 200,
