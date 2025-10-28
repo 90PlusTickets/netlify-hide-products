@@ -1,7 +1,8 @@
-// ✅ FINALNÍ VERZE getMatches.js
-// Soubor: functions/getMatches.js
-
+// functions/getMatches.js
 const fetch = require("node-fetch");
+const { aliasMap } = require("./aliasMap");
+
+const API_KEY = process.env.FOOTBALL_API_KEY;
 
 const TEAM_IDS = {
   "ac-milan": "98",
@@ -41,37 +42,35 @@ const TEAM_IDS = {
   "rangers": "257"
 };
 
-const API_KEY = process.env.FOOTBALL_API_KEY;
-
 exports.handler = async function () {
   const allMatches = [];
 
-  for (const [teamKey, teamId] of Object.entries(TEAM_IDS)) {
-    try {
-      const response = await fetch(
-        `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=2025&timezone=Europe/Prague`,
-        {
-          headers: {
-            "x-apisports-key": API_KEY
-          }
-        }
-      );
+  for (const [teamName, teamId] of Object.entries(teamIds)) {
+    const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&next=10`;
 
-      const data = await response.json();
-      const teamMatches = data.response.map(match => ({
-        home_team: match.teams.home.name,
-        away_team: match.teams.away.name,
-        utcDate: match.fixture.date
-      }));
+    const response = await fetch(url, {
+      headers: {
+        "x-apisports-key": API_KEY,
+      },
+    });
 
-      allMatches.push(...teamMatches);
-    } catch (error) {
-      console.error(`Chyba při získávání zápasů pro tým ${teamKey}:`, error);
+    if (!response.ok) {
+      console.error(`Failed to fetch matches for ${teamName}`);
+      continue;
     }
+
+    const data = await response.json();
+    const matches = data.response.map(match => ({
+      home_team: match.teams.home.name,
+      away_team: match.teams.away.name,
+      utcDate: match.fixture.date,
+    }));
+
+    allMatches.push(...matches);
   }
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ matches: allMatches })
+    body: JSON.stringify({ matches: allMatches }),
   };
 };

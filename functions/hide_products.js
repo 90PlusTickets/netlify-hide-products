@@ -1,9 +1,8 @@
 const fetch = require("node-fetch");
-const aliasMap = require("./aliasMap");
+const { aliasMap, normalizeTeamName } = require("./aliasMap"); // ✅
 
 const SHOPIFY_ADMIN_API_TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE;
-
 const getMatchesUrl = "https://mellow-tiramisu-9b78f4.netlify.app/.netlify/functions/getMatches";
 
 exports.handler = async function () {
