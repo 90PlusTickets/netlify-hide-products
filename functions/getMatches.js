@@ -43,9 +43,7 @@ const TEAM_IDS = {
 };
 
 exports.handler = async function () {
-  const allMatches = [];
-
- for (const [teamName, teamId] of Object.entries(TEAM_IDS)) {
+  const teamId = "98"; // AC Milan
   const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&next=10`;
 
   const response = await fetch(url, {
@@ -54,23 +52,10 @@ exports.handler = async function () {
     },
   });
 
-  if (!response.ok) {
-    console.error(`Failed to fetch matches for ${teamName}`);
-    continue;
-  }
-
-  const data = await response.json();
-  const matches = data.response.map(match => ({
-    home_team: match.teams.home.name,
-    away_team: match.teams.away.name,
-    utcDate: match.fixture.date,
-  }));
-
-  allMatches.push(...matches);
-}
+  const raw = await response.text();
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ matches: allMatches }),
+    body: raw,
   };
 };
