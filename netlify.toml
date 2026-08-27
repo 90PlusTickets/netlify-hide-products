@@ -1,8 +1,10 @@
 [functions]
+  directory = "functions"
   node_bundler = "esbuild"
 
 [functions."hide_products"]
   included_files = ["functions/aliasMap.js"]
+  schedule = "15 3 * * *"
 
 [functions."email_upcoming_hide"]
   included_files = ["functions/aliasMap.js"]
